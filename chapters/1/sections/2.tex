@@ -1,0 +1,128 @@
+% % % % % % % % % % % % % % % % % %
+%                                 %
+%  Master Thesis                  %
+%  MSc in Aerospace Engineering   %
+%  Mattia Gregnanin               %
+%  A.Y. 2025/2026                 %
+%                                 %
+% % % % % % % % % % % % % % % % % %
+%                                 %
+%  Chapter 1 / Section 2          %
+%                                 %
+% % % % % % % % % % % % % % % % % %
+
+\section{Components of a Flight Computer System}
+\label{sec:components}
+
+A flight computer for rockets typically consists of the functional blocks shown in \cref{fig:block_diagram}, which monitor and, in some cases, control the flight of the rocket. Each block is introduced in the following subsections in general terms, while the choices made for this work are discussed in \cref{sec:choices}.
+
+\begin{figure}[htb]
+    \centering
+    \resizebox{\textwidth}{!}{%
+    \begin{tikzpicture}[
+        >={Latex[length=2mm]},
+        block/.style={draw, rounded corners=2pt, minimum width=28mm, minimum height=9mm, align=center, font=\sffamily\small, drop shadow},
+        sensor/.style={block, fill=blue!10},
+        core/.style={block, thick, minimum width=34mm, minimum height=40mm, fill=red!20},
+        output/.style={block, fill=green!10},
+        ext/.style={block, dashed, minimum width=24mm, fill=yellow!10},
+        pwr/.style={block, fill=orange!10}
+    ]
+    % Sensors
+    \node[sensor] (imu)  at (-4.2, 1.65)  {IMU};
+    \node[sensor] (mag)  at (-4.2, 0.55)  {Magnetometer};
+    \node[sensor] (baro) at (-4.2,-0.55)  {Barometer};
+    \node[sensor] (gnss) at (-4.2,-1.65)  {GNSS receiver};
+
+    % Processing
+    \node[core] (mcu) at (0,0) {Microcontroller\\[2mm] State estimation\\[2mm] Flight logic};
+
+    % Outputs
+    \node[output] (sd)    at (4.2, 1.4)  {Data storage\\(SD / flash)};
+    \node[output] (radio) at (4.2, 0)    {Radio\\transceiver};
+    \node[output] (pyro)  at (4.2,-1.4)  {Pyro channels\\(drivers)};
+
+    % External elements
+    \node[ext] (gs)      at (8.2, 0)    {Ground\\station};
+    \node[ext] (charges) at (8.2,-1.4)  {Recovery\\charges};
+
+    % Power
+    \node[pwr] (pwr) at (0,-3.4) {Battery and power regulation};
+
+    % Connections
+    \foreach \s in {imu,mag,baro,gnss}
+        \draw[->] (\s.east) -- (\s.east -| mcu.west);
+    \draw[->]  (mcu.east |- sd.west)    -- (sd.west);
+    \draw[<->] (mcu.east |- radio.west) -- (radio.west);
+    \draw[->]  (mcu.east |- pyro.west)  -- (pyro.west);
+    \draw[<->, dashed] (radio.east) -- node[above, font=\scriptsize]{RF link} (gs.west);
+    \draw[->, dashed]  (pyro.east)  -- (charges.west);
+    \draw[->]  (pwr.north) -- (mcu.south);
+    \draw[->]  (pwr.west) -| (gnss.south);
+    \draw[->]  (pwr.east) -| (pyro.south);
+    \end{tikzpicture}}
+    \caption{Block diagram of a typical flight computer of a rocket without active stabilization. Dashed elements are external to the board, while power connections to the remaining blocks are omitted for clarity.}
+    \label{fig:block_diagram}
+\end{figure}
+
+\subsection{Microcontroller} 
+
+Microcontrollers (MCUs) act as the central processing unit of the flight computer, responsible for gathering and processing data from the various sensors, writing data to storage, sending and receiving data from the communication modules, and executing the software that controls the rocket's flight. Common microcontrollers used in amateur rocketry include 8-bit devices such as the ATmega of Arduino boards, and 32-bit devices such as the ESP32 and the STM32 series. The 32-bit devices with a floating-point unit (FPU) are better suited to running state estimation algorithms onboard, which are demanding in terms of computation.
+    
+Some flight computers may even use multiple microcontrollers or microprocessors to handle different tasks, such as one for sensor data processing and another for communication and control~\cite{bps:ava}. This can improve the performance and reliability of the flight computer system by distributing the workload across multiple processing units, but requires careful design and coordination between the different microcontrollers to ensure an efficient and reliable operation of the overall system.
+
+\subsection{Sensors} 
+
+Flight computers are equipped with various sensors to measure different parameters during flight. Common sensors include:
+
+\begin{itemize}
+    \item \textbf{Accelerometers:} Measure the rocket's specific acceleration along multiple axes. Integrating it once and twice gives velocity and position, but the errors due to bias and noise grow linearly and quadratically with time, so inertial integration alone is accurate only over short intervals. When the non-gravitational acceleration is negligible, the direction of gravity also provides a reference for the orientation. Accelerometers with a wide measurement range (high-g) are used to measure shocks such as those of the ejection charges and of the landing. 
+    \item \textbf{Gyroscopes:} Measure the rocket's angular velocity, helping to determine its orientation and stability during flight. Bias and noise produce errors that grow over time as the angular rate is integrated~\cite{titterton2004strapdown}. The combination of accelerometers and gyroscopes is often referred to as an \emph{Inertial Measurement Unit} (IMU).
+    \item \textbf{Magnetometers:} Measure the Earth's magnetic field, which provides an absolute reference for the heading (the rotation about the vertical axis), not observable from accelerometers and gyroscopes alone. They are often subject to magnetic interference from the rocket's structure and electronics, thus requiring careful calibration and filtering to obtain accurate readings.
+    \item \textbf{Barometers:} Measure atmospheric pressure, which can be used to calculate the altitude with a model of the atmosphere. The electronic bay of the rocket must be designed in order to allow ventilation, and the ground pressure must be measured before launch to provide a reference for altitude calculations.
+    \item \textbf{GNSS Receivers:} Provide position and velocity at update rates typically between $\SIrange{1}{10}{Hz}$, and up to $\SI{25}{Hz}$ in some receivers~\cite{m9n:datasheet}, which allows the trajectory to be tracked and the rocket to be located after landing. Their performance depends on the antenna, on a clear view of the sky and on the dynamic model of the receiver, which may limit the acceleration, speed and altitude at which valid solutions are provided.
+\end{itemize}
+
+\subsection{Power Supply} 
+
+Flight computers require a reliable power source throughout the flight. This is typically provided by batteries, with lithium polymer (LiPo) cells and alkaline batteries being used in amateur rocketry devices~\cite{altus:telemetrum,featherweight:blueraven}. The battery is chosen according to its capacity, weight, discharge current capability and voltage~\cite{reddy2011linden}. Since the battery voltage generally differs from the one required by the microcontroller and the sensors, and varies with the state of charge, it is converted to the appropriate levels using voltage regulators or power management circuits~\cite{horowitz2015art}.
+
+Power distribution requires particular care in a rocket. Vibration and the high-current pulses drawn when a pyrotechnic igniter is fired can cause temporary voltage drops or momentary loss of electrical contact. If the supply voltage falls below the threshold of the microcontroller's \emph{brownout detector} (BOD), the device may reset, leading to a loss of flight data or of the recovery events. Two measures can be adopted to reduce this risk.
+
+The first is power redundancy. Two batteries can be combined through Schottky diodes in an OR configuration: the load is supplied by the source with the higher voltage, and the diodes prevent one battery from supplying or discharging the other. Schottky diodes are preferred for their low forward voltage drop, which however still reduces the voltage available to the load and must be taken into account in the design~\cite{horowitz2015art}.
+
+The second is the separation between the logic circuits (microcontroller and sensors) and the pyrotechnic channels. The igniters are driven by solid-state switches, such as power MOSFETs, while optoisolators can be used to transmit the control signal from the microcontroller to the driver without a direct electrical connection between the two circuits, so that current spikes and voltage sags on the pyrotechnic side do not propagate to the logic side~\cite{horowitz2015art}.
+
+\subsection{Data Storage} 
+
+Flight computers may include onboard data storage to log sensor and processed data during flight. Two types of non-volatile memory are commonly used:
+\begin{itemize}
+    \item \textbf{SD cards:} These removable storage devices offer high capacity and ease of use, allowing for quick data retrieval and analysis after the flight. However, they may be more susceptible to vibration and shock, corruption after sudden power loss, and they may break in the event of a hard landing.
+    \item \textbf{Soldered flash memory:} Non-volatile memory chips that are soldered directly onto the flight computer's PCB. They are more robust and resistant to vibration and shock compared to SD cards, but they may have lower storage capacity and can be more difficult to access for data retrieval.
+\end{itemize}
+
+The telemetry link can be interrupted or limited in rate, so the onboard storage provides a complete record of the flight, which is used for post-flight analysis, for the validation of simulations and for reprocessing the estimation offline.
+
+\subsection{Communication Modules}
+
+A communication module allows the flight computer to exchange data with a ground station through a radio link. Its main function is the \emph{downlink} of telemetry, such as the estimated state, sensor readings and flight events, which allows the rocket to be monitored in real time and located after landing. A bidirectional \emph{transceiver} can also receive commands from the ground, for example for remote arming or configuration.
+
+Flight computers for amateur rocketry use either the amateur radio bands, which require the user to hold a licence~\cite{altus:telemetrum}, or licence-exempt bands reserved for short-range devices (SRD). In Europe, the latter include the \SIrange{863}{870}{MHz} band, whose sub-bands are subject to limits on the radiated power and on the duty cycle~\cite{erc7003,etsi300220}. Common transceiver ICs, such as the Semtech SX127x family~\cite{sx1276}, support conventional frequency-shift keying (FSK) as well as the LoRa modulation, which trades data rate for receiver sensitivity and is therefore widely used for long-range, low-rate links~\cite{augustin2016lora}.
+
+The performance of the link depends on the transmit power, the receiver sensitivity, the antennas and the environment, including the materials of the airframe.
+    
+\subsection{Recovery System Control}
+
+Flight computers are commonly responsible for triggering the deployment of the recovery system, which slows the rocket down so that it can land safely. Deployment is usually achieved by igniting a small black powder charge that pressurizes a section of the airframe and separates it, releasing the parachute. The charge is ignited by an electric igniter (often called an \emph{e-match}), which is driven by a dedicated \emph{pyrotechnic channel} of the flight computer, typically a power transistor that briefly supplies a high current to the igniter~\cite{altus:telemetrum,featherweight:blueraven}. Alternatively, mechanical release mechanisms driven by servos or motors can be used.
+
+The deployment events are decided from the measured flight conditions. The most common one is the detection of \emph{apogee}, i.e., the highest point of the trajectory, which is usually based on the barometric altitude and, in some devices, on accelerometer data~\cite{perfectflite,featherweight:blueraven}. A widely used scheme is \emph{dual deployment}, in which a small drogue parachute is released at apogee to limit the drift and the descent speed, and the main parachute is released at a lower, predefined altitude~\cite{altus:telemetrum}. This requires at least two independent pyrotechnic channels.
+
+Since the channels handle pyrotechnic devices, safety measures are an integral part of the design. Typical examples are an arming switch that keeps the channels disconnected until shortly before launch, and a continuity check of the igniters, which verifies that they are correctly connected before flight~\cite{altus:telemetrum}.
+
+\subsection{Actuators} 
+
+Some rockets include active control systems, such as \emph{thrust vector control} (TVC), airbrakes to control the apogee, or movable fins and canards to control the roll. These systems use servomotors or other actuators commanded in closed loop from the estimated state of the rocket. The flight computer developed in this work does not include actuators: the estimated state is used for monitoring and for the recovery events only.
+
+\subsection{Software} 
+
+The software of a flight computer acquires the sensor measurements, estimates the state of the rocket, detects the flight events and manages data logging and telemetry. It is commonly organised around a fixed-rate main loop or a real-time operating system (RTOS) that schedules these tasks~\cite{white2024making}, with a \emph{finite state machine} (FSM) tracking the flight phases (liftoff, burnout, apogee, deployment, landing). The estimation algorithms and the firmware of this work are described in \cref{ch:estimation}.

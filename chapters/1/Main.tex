@@ -1,0 +1,33 @@
+% % % % % % % % % % % % % % % % % %
+%                                 %
+%  Master Thesis                  %
+%  MSc in Aerospace Engineering   %
+%  Mattia Gregnanin               %
+%  A.Y. 2025/2026                 %
+%                                 %
+% % % % % % % % % % % % % % % % % %
+%                                 %
+%  Chapter 1                      %
+%                                 %
+% % % % % % % % % % % % % % % % % %
+
+\graphicspath{{chapters/1/figures/}}
+
+\chapter[State of the Art and Design Motivations]{State of the Art in Rocket Flight Computers and Design Motivations}
+\label{ch:state-of-the-art}
+
+This thesis presents the design of a flight computer for an amateur rocket developed by a small team of students. Its objective is to acquire measurements from onboard sensors, to reconstruct the attitude, position and velocity of the rocket in real time, and to transmit them to a ground station by radio. This chapter places this work in the context of existing solutions and motivates the design choices that were made.
+
+Flight computers for amateur rocketry are rarely documented in the scientific literature. The review therefore relies mainly on manufacturers' manuals and datasheets, on the repositories and documentation published by open-source projects and student teams, and on the technical literature on inertial navigation and sensor fusion. 
+
+The chapter is organised as follows. \cref{sec:history} outlines the historical development of flight computers, from the guidance systems of the first rockets to the devices available to amateur rocketry. \cref{sec:components} describes the functional blocks that compose a flight computer. \cref{sec:existing} reviews commercial products and open-source or student projects, and compares them in terms of sensors, estimation capabilities and telemetry. Finally, \cref{sec:choices} defines the requirements of the flight computer developed in this work and motivates the choice of the microcontroller, of the sensors and of the radio module. The design of the power supply, of the recovery electronics and of the data storage is described in \cref{ch:hardware}, while the estimation algorithms and the firmware are presented in \cref{ch:estimation,ch:firmware}.
+
+\input{chapters/1/sections/1.tex}
+
+\input{chapters/1/sections/2.tex}
+
+\input{chapters/1/sections/3.tex}
+
+\input{chapters/1/sections/4.tex}
+
+\input{chapters/1/sections/5.tex}

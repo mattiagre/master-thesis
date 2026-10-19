@@ -7,9 +7,17 @@
 *.out
 *.synctex.gz
 *.xmpi
+*.toc
 
 # Ignore TikZ cache folder
-tikz-cache/
+tikz/
+
+# Ignore temporary files produced by bibtex and biber
+*.bbl
+*.bbl-SAVE-ERROR
+*.bcf
+*.blg
+*.run.xml
 
 # Ignore the PDF produced locally
 Gregnanin_Mattia.pdf

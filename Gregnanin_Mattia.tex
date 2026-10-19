@@ -5,96 +5,128 @@
 %  Mattia Gregnanin               %
 %  A.Y. 2025/2026                 %
 %                                 %
-% % % % % % % % % % % % % % % % % %   
+% % % % % % % % % % % % % % % % % %
 %                                 %
 %  Main file                      %
 %                                 %
 % % % % % % % % % % % % % % % % % %
 
-\documentclass[11pt]{article}
+\pdfminorversion=7
+\pdfobjcompresslevel=0
 
-% Set paper size and margins
-\usepackage[a4paper,margin={3cm,3cm}]{geometry}
+\documentclass[%
+  12pt,
+  tipotesi=magistrale,
+  twoside,
+  libro,
+  nocenterfolio,
+  nocenterhead,
+  english
+]{toptesi}
 
 % Text encoding packages
 \usepackage[T1]{fontenc}
 \usepackage[utf8]{inputenc}
-\usepackage[english]{babel}
+\usepackage[draft,nopatch=footnote]{microtype}
+
+% Load the xcolor package with the `rgb` option for PDF/A compatibility
+\usepackage[rgb]{xcolor}
 
 % Math relating packages
 \usepackage{amssymb}
 \usepackage{amsmath}
 \usepackage{mathtools}
 \usepackage{siunitx}
+\let\siunitxunit\unit
+\sisetup{
+  output-decimal-marker = {.},
+  input-decimal-markers = {.}
+}
 
 % Font packages
 \usepackage{libertine}
+\usepackage[scaled=0.85]{beramono}
 \usepackage{libertinust1math}
+\usepackage{mathalpha}
 \usepackage{bm}
+\usepackage{textcomp}
 
-% Load the xcolor package with the `rgb` option for PDF/A compatibility
-\usepackage[rgb]{xcolor}
+% Packages for figures and graphics 
+\usepackage{graphicx}
+\usepackage{subcaption}
+\graphicspath{{figures/}}
+\usepackage{float}
 
+% TikZ and PGFPlots
 \usepackage{tikz}
-\usetikzlibrary{external} % To cache figures locally
-\tikzexternalize[prefix=tikz-cache/]
+\usetikzlibrary{external,calc,shapes.geometric,arrows.meta,positioning,shadows}
+\tikzexternalize[prefix=tikz/]
 \usepackage{pgfplots}
 \pgfplotsset{compat=1.18}
 \usepgfplotslibrary{colormaps}
 
+% Tables
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{adjustbox}
+\newcommand{\tick}{\checkmark}
+\newcommand{\cross}{--}
+
+% Bibliography management
+\usepackage{csquotes}
+\usepackage[backend=biber,style=numeric-comp]{biblatex}
+\addbibresource{References.bib}
+
 % Produce a PDF/A-3b
 \usepackage[a-3b]{pdfx}
 
-% For testing purposes 
-\usepackage{lipsum}
+% Setup hyperref (loaded by pdfx)
+\usepackage{xurl}
+\hypersetup{%
+  pdfpagemode={UseOutlines},
+  bookmarksopen,
+  pdfstartview={FitH},
+  colorlinks,
+  linkcolor={blue},
+  citecolor={blue},
+  urlcolor={blue}
+}
+\usepackage[capitalise,nameinlink]{cleveref}
 
-\title{Master Thesis}
-\author{Mattia Gregnanin}
-\date{A.Y. 2025/2026}
+% Set the paragraph spacing
+\setlength{\parskip}{1em}
+
+% Unit definitions
+\DeclareSIUnit{\gforce}{\textit{g}}
+\DeclareSIUnit{\lsb}{LSB}
+\DeclareSIUnit{\rthz}{\ensuremath{\sqrt{\mathrm{Hz}}}}
+\DeclareSIUnit{\hPa}{hPa}
 
 \begin{document}
-    \maketitle
 
-    \lipsum[1]
-    
-    \begin{equation}
-        \iint_{\partial\mathcal{V}}{\mathbf{E} \cdot d\mathbf{S}} = \iiint_{\mathcal{V}}{\frac{\rho}{\epsilon_0}d\mathcal{V}}
-    \end{equation}
+  % Restore the original \unit command from siunitx
+  \let\unit\siunitxunit
 
-    \lipsum[2]
+  % Select english language
+  % \ExtendCaptions{english}{Abstract}{Acknowledgements}
+  \english
 
-    \begin{equation}
-        \begin{dcases}
-            \frac{D\rho}{Dt} = - \rho\nabla \cdot \mathbf{V} \\
-            \rho\frac{D\mathbf{V}}{Dt} = \rho\mathbf{g} + \nabla \cdot \bm{\mathrm{T}}
-        \end{dcases}
-    \end{equation}
+  % Load the frontispiece
+  \input{Frontispiece}
 
-    \lipsum[3-8]
+  % Acknowledge
+  \ringraziamenti
 
-    \begin{figure}[tp]
-        \centering
-        \begin{tikzpicture}
-            \begin{axis}[
-                xmin=-2.5,
-                xmax=2.5,
-                ymin=-2.5,
-                ymax=2.5,
-                xlabel=$x$,
-                ylabel=$y$,
-                zlabel=$z$,
-                ticks=none,
-                colormap/spring,
-                view={10}{50}
-            ]
-                \addplot3[densely dashed,domain=0:360,samples=50,samples y=0] ({1.5*cos(x)},{sin(x)},{-4});
-                \addplot3[mesh,domain=-2:2,y domain=-2:2] {x^2 - y^2*sin(deg(x))};
-                \addplot3[surf,shader=interp,domain=0:360,y domain=0:1] ({1.5*y*cos(x)}, {y*sin(x)}, {2.25*y^2*cos(x)^2 - y^2*sin(x)^2*sin(deg(1.5*y*cos(x)))});
-                \addplot3[thick,domain=0:360,samples=50] ({1.5*cos(x)},{sin(x)},{2.25*cos(x)^2 - sin(x)^2*sin(deg(1.5*cos(x)))});
-                \node at (0,0,0.5) {$\displaystyle\iint_{\bm{\varphi}}{f\,d\Sigma}$};
-                \node at (-1.2,-1,-4) {$\bm{\varphi}$};
-            \end{axis}
-        \end{tikzpicture}
-        \caption{}
-    \end{figure}
+  % Abstract
+  \sommario
+
+  % Indexes
+  \indici
+
+  \mainmatter
+
+  \include{chapters/1/Main}
+
+  \printbibliography
+
 \end{document}

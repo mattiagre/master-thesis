@@ -1,0 +1,345 @@
+% % % % % % % % % % % % % % % % % %
+%                                 %
+%  Master Thesis                  %
+%  MSc in Aerospace Engineering   %
+%  Mattia Gregnanin               %
+%  A.Y. 2025/2026                 %
+%                                 %
+% % % % % % % % % % % % % % % % % %
+%                                 %
+%  Chapter 1 / Section 4          %
+%                                 %
+% % % % % % % % % % % % % % % % % %
+
+\newcommand{\reqdef}[1]{\hypertarget{req:#1}{#1}}
+\newcommand{\req}[1]{\hyperlink{req:#1}{#1}}
+
+\section{Design Choices}
+\label{sec:choices}
+
+The review in \cref{sec:existing} shows that most flight computers for amateur rocketry are designed around recovery and flight logging, and that the few solutions providing onboard state estimation and telemetry differ in the quantities they estimate and in the documentation available.
+
+Starting from this background, this section defines the requirements of the flight computer developed in this work and motivates the choice of each of its components. The requirements are presented first, and are then used as criteria to compare the alternatives found in the existing solutions and to justify the selected components. The hardware implementation of the selected components is described in Chapter~\ref{ch:hardware}.
+
+\subsection{Requirements}
+\label{sec:requirements}
+
+The flight computer is intended for an amateur rocket developed by a small team of students, with a target apogee of about $\SI{500}{m}$ in the current configuration (class F motor) and the possibility of reaching higher altitudes in future versions. Its objective is to measure the flight with onboard sensors, to reconstruct the attitude, position and velocity of the rocket and to transmit them to a ground station by radio. The following requirements were derived from this objective and from the limitations of the solutions reviewed in Section~\ref{sec:existing}.
+
+The requirements of the flight computer are divided into functional requirements (\cref{tab:functional-requirements}), which describe what the system must do, performance requirements (\cref{tab:performance-requirements}), which quantify how well it must do it, and constraints (\cref{tab:design-requirements}), which limit the design space. 
+
+\begin{table}[tbp]
+    \centering
+    \small
+    \renewcommand{\arraystretch}{1.25}
+    \caption{Functional requirements. Verification methods: T = test, A = analysis, I = inspection, D = demonstration.}
+    \label{tab:functional-requirements}
+    \begin{tabularx}{\textwidth}{@{}l >{\raggedright\arraybackslash}X >{\raggedright\arraybackslash}X c@{}}
+        \toprule
+        \textbf{ID} & \textbf{Requirement} & \textbf{Rationale} & \textbf{Verif.} \\
+        \midrule
+        \reqdef{F01} & The system shall acquire measurements from the onboard sensors. & Input of the estimation algorithm and data for post-flight analysis. & T \\
+        \reqdef{F02} & The system shall estimate the attitude, position and velocity of the rocket onboard. & Core objective of the work. & T, A \\
+        \reqdef{F03} & The system shall detect the flight events and trigger the corresponding actions. & Safe recovery of the rocket or active guidance. & T, D \\
+        \reqdef{F04} & The system shall transmit the estimated state and the GNSS position to a ground station. & Real-time monitoring and recovery of the rocket. & T \\
+        \reqdef{F05} & The system shall store flight data in non-volatile memory. & Post-flight analysis and validation of the estimation algorithm. & T, I \\
+        \reqdef{F06} & The system shall provide two pyrotechnic channels to control the recovery system. & Safe recovery of the rocket. & T, D \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\begin{table}[tbp]
+    \centering
+    \small
+    \renewcommand{\arraystretch}{1.25}
+    \caption{Performance requirements. Each requirement refers to the functional requirement it quantifies. Verification methods: T = test, A = analysis, I = inspection.}
+    \label{tab:performance-requirements}
+    \begin{tabularx}{\textwidth}{@{}l >{\raggedright\arraybackslash}X >{\raggedright\arraybackslash}X c@{}}
+        \toprule
+        \textbf{ID} & \textbf{Requirement} & \textbf{Acceptance criterion} & \textbf{Verif.} \\
+        \midrule
+        \reqdef{P01.01} & Sensor sampling rate of at least \SI{100}{Hz}. & Measured sampling period within \SI{1}{\percent} of nominal. & T \\
+        \reqdef{P01.02} & GNSS receiver sampling rate of at least \SI{1}{Hz}. & Measured sampling period within \SI{1}{\percent} of nominal. & T \\
+        \midrule
+        \reqdef{P02.01} & State estimation update rate of at least \SI{100}{Hz}. & Measured update period within \SI{1}{\percent} of nominal. & T \\
+        \reqdef{P02.02} & Attitude estimation error below \SI{5}{\degree}. & Comparison with a reference (simulation or ground-truth flight) on the same data. & T, A \\
+        \reqdef{P02.03} & Position estimation error below \SI{10}{m}. & Comparison with a reference (simulation or ground-truth flight) on the same data. & T, A \\
+        \reqdef{P02.04} & Velocity estimation error below \SI{5}{m/s}. & Comparison with a reference (simulation or ground-truth flight) on the same data. & T, A \\
+        \midrule
+        \reqdef{P03.01} & Flight event detection latency within \SI{0.1}{s}. & Measured latency on a reference flight. & T \\
+        \reqdef{P03.02} & Apogee detection error below \SI{10}{m}. & Comparison with a reference (simulation or ground-truth flight) on the same data. & T, A \\
+        \midrule
+        \reqdef{P04.01} & Telemetry link range of at least \SI{1}{km}. & Measured range in a line-of-sight test. & T \\
+        \reqdef{P04.02} & Telemetry link data rate of at least \SI{2.4}{kbps}. & Measured data rate in a line-of-sight test. & T \\
+        \midrule
+        \reqdef{P05.01} & Data storage capacity of at least \SI{30}{minutes} of flight data. & Measured available storage space. & I \\
+        \midrule
+        \reqdef{P06.01} & The pyrotechnic channels must be able to drive a load with a nominal resistance of \SI{1.5}{\ohm} at a current of at least \SI{0.4}{A}. & Measured current and voltage on a resistive load. & T \\
+        \bottomrule 
+    \end{tabularx}
+\end{table}
+
+\begin{table}[tbp]
+    \centering
+    \small
+    \renewcommand{\arraystretch}{1.25}
+    \caption{Design requirements. Verification methods: T = test, A = analysis, I = inspection.}
+    \label{tab:design-requirements}
+    \begin{tabularx}{\textwidth}{@{}l >{\raggedright\arraybackslash}X >{\raggedright\arraybackslash}X c@{}}
+        \toprule
+        \textbf{ID} & \textbf{Requirement} & \textbf{Rationale} & \textbf{Verif.} \\
+        \midrule
+        \reqdef{D01} & The board must fit in an electronics bay of at most \SI{50}{mm} diameter and \SI{80}{mm} length. & Airframe design. & I \\
+        \reqdef{D02} & The system must withstand an acceleration of up to \SI{100}{\gforce} and must not reset when the pyrotechnic channels are fired. & Lift-off and recovery events. & T \\
+        \reqdef{D03} & The system must operate in a temperature range of at least \SIrange{-20}{50}{\degreeCelsius} and up to \SI{10}{km} of altitude. & Flight environment. & T \\
+        \reqdef{D04} & The board must be powered by a single \SI{3.7}{V} LiPo battery. & Simplicity and availability of the power source. & I \\
+        \reqdef{D05} & The cost of the components must not exceed about 100 \texteuro{} per board. & Affordability for a amateur team. & I \\
+        \reqdef{D06} & The radio link must operate in a licence-exempt band. & Regulatory compliance. & A, T \\
+        \reqdef{D07} & The pyrotechnic channels shall remain disabled until the rocket is armed. & Safety rules~\cite{nar:safetycode,tripoli:safetycode}. & T, I \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\subsection{Microcontroller}
+\label{sec:mcu-choice}
+
+\paragraph{Requirements.} The microcontroller shall satisfy the following requirements, which derive from the functional and performance requirements of \cref{tab:functional-requirements,tab:performance-requirements,tab:design-requirements}:
+\begin{itemize}
+    \item a single-precision floating-point unit (FPU) and a computing power sufficient to run the estimation algorithm at the required rate with an adequate margin (\req{P02.01}); 
+    \item at least 3 SPI, 3 I\textsuperscript{2}C and 2 UART interfaces to connect the sensors, the GNSS receiver, the radio module and the storage (\req{F01}, \req{F04}, \req{F05});
+    \item enough RAM for the state and covariance matrices of the filter and for the data buffers, and enough flash memory for the firmware; % TODO: give an estimate of the memory needed
+    \item a USB interface and a hardware debug interface (SWD or JTAG) for programming, data download and debugging;
+    \item a low cost and a long-term availability, supported by a wide community and by manufacturer documentation (\req{D05}). % TODO: give a target cost
+\end{itemize}
+
+\paragraph{Alternatives.} The microcontrollers used by the solutions reviewed in \cref{sec:existing} are listed in \cref{tab:mcu-comparison}. Hobbyist designs often rely on 8-bit microcontrollers such as the ATmega, which lack an FPU and have limited memory, and are therefore not adequate for the estimation algorithm. Among 32-bit devices, the ESP32 family offers a high clock frequency at low cost, and integrates Wi-Fi and Bluetooth, which are not needed in this application. The STM32 family offers a wide range of devices based on ARM Cortex-M cores with FPU, from the STM32F4 series (Cortex-M4, up to $\SI{180}{MHz}$) to the STM32H7 series (Cortex-M7, up to $\SI{480}{MHz}$ or more depending on the device), and is used by three of the four open-source projects reviewed. The Teensy 4.1 used in the HPR flight computer offers a much higher computing power, but it is a development board and not a bare microcontroller.
+
+\begin{table}[htb]
+    \centering
+    \small
+    \caption{Microcontrollers of the flight computers reviewed in Section~\ref{sec:existing} and of the main alternatives.}
+    \label{tab:mcu-comparison}
+    \begin{tabular}{@{}l l c c c l@{}}
+        \toprule
+        \textbf{MCU} & \textbf{Core} & \textbf{Clock} & \textbf{RAM} & \textbf{Flash} & \textbf{Used in} \\
+        & & {\footnotesize (\unit{\mega\hertz})} & {\footnotesize (\unit{\kilo\byte})} & {\footnotesize (\unit{\mega\byte})} & \\
+        \midrule
+        STM32F411 & Cortex-M4F & 100 & 128 & 0.5 & Vega \\
+        STM32F407 & Cortex-M4F & 168 & 192 & 1 & Vector II \\
+        STM32F405 & Cortex-M4F & 168 & 192 & 1 & This work \\
+        STM32H743 & Cortex-M7 & 480 & 1024 & 2 & TUDSaT Zenith \\
+        Teensy 4.1 & Cortex-M7 & 600 & 1024 & 8 & HPR \\
+        ESP32 & Xtensa LX6 (dual) & 240 & 520 & external & -- \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\paragraph{Choice.} The STM32F405RGT6 was selected, in the LQFP64 package~\cite{stm32f405:datasheet}. It has a Cortex-M4 core with a single-precision FPU running at up to \SI{168}{MHz}, \SI{192}{kB} of SRAM and \SI{1}{MB} of flash memory, and provides 3 SPI, 3 I\textsuperscript{2}C and 6 UART interfaces, USB and SWD, which satisfy the requirements above.
+The estimation filter requires about [X] kB of RAM and an execution time of [Y]\,\textmu s per update, which corresponds to a CPU load of about [Z]\,\% at the update rate of $\SI{1}{Hz}$. % TODO: replace with a measurement or an estimate: this is the most important justification
+The STM32F4 series was preferred to the ESP32 for the development environment and the availability of development tools. A higher-end device such as the STM32H743 was not necessary, since the F405 already provides an adequate margin for the algorithm, and it is the same family used by the Vector II (F407)~\cite{NETZEL2026e00803} with similar characteristics.
+
+\subsection{Inertial Measurement Unit}
+\label{sec:imu-choice}
+
+\paragraph{Requirements.} The inertial measurement unit (IMU) shall satisfy the following requirements:
+\begin{itemize}
+    \item a 3-axis accelerometer and a 3-axis gyroscope, with a measurement range covering the maximum acceleration and angular rate expected during the flight, of at least $\pm\SI{16}{\gforce}$ and $\pm\SI{2000}{\degree/s}$ respectively (\req{F01});
+    \item an output data rate of at least \SI{100}{Hz} (\req{P01.01});
+    \item a noise density and a bias stability sufficient to keep the attitude, velocity and position errors within the limits of \req{P02.02}, \req{P02.03} and \req{P02.04};
+    \item a low cost and good availability (\req{D05}).
+\end{itemize}
+
+\paragraph{Alternatives.} The IMUs adopted by the open-source flight computers reviewed in \cref{sec:existing}, together with two widely used devices, are compared in \cref{tab:imu-comparison}. The MPU-6050 has long been the reference IMU of hobbyist projects thanks to its low cost and wide software support, but it has a higher noise density than the more recent devices and the manufacturer does not recommend it for new designs~\cite{mpu6050:datasheet}. Among the devices used in the reviewed projects, the ICM-42688-P and the LSM6DSO32 offer respectively a low noise density and an extended accelerometer range of $\pm\SI{32}{\gforce}$, but not both. In the reviewed projects, a wide range is obtained either with an IMU with a high accelerometer full-scale (CATS Vega) or by adding a separate high-g accelerometer (TUDSaT Zenith, HPR and Vector II).
+
+\begin{table}[htb]
+    \centering
+    \small
+    \setlength{\tabcolsep}{3pt}
+    \caption{Comparison of the IMUs used in the flight computers reviewed in \cref{sec:existing} and of the main alternatives. The resolution is the maximum available at the indicated full scale, and the noise density is given in the low-noise mode.}
+    \label{tab:imu-comparison}
+    \begin{tabular}{@{}l ccc ccc l@{}}
+        \toprule
+        & \multicolumn{3}{c}{\textbf{Accelerometer}} & \multicolumn{3}{c}{\textbf{Gyroscope}} & \\
+        \cmidrule(lr){2-4} \cmidrule(lr){5-7}
+        \textbf{IMU} & \textbf{Range} & \textbf{Res.} & \textbf{Noise} & \textbf{Range} & \textbf{Res.} & \textbf{Noise} & \textbf{Used in} \\
+        & {\scriptsize (\unit{\gforce})} & {\scriptsize (\unit{\lsb/\gforce})} & {\scriptsize (\unit{\micro\gforce/\rthz})} & {\scriptsize (\unit{\degree/\second})} & {\scriptsize (\unit{\lsb\per(\degree\per\second)})} & {\scriptsize (\unit{(\milli\degree\per\second)\per\rthz})} & \\
+        \midrule
+        MPU-6050~\cite{mpu6050:datasheet}     & $\pm16$ & 2048 & 400 & $\pm2000$ & 16.4 & 5 & -- \\
+        BMI088~\cite{bmi088:datasheet}        & $\pm24$ & 1365 & \numrange{160}{190} & $\pm2000$ & 16.4 & 14 & -- \\
+        ICM-42670-P~\cite{icm42670:datasheet} & $\pm16$ & 2048 & 100 & $\pm2000$ & 16.4 & 7 & Zenith, Vector II \\
+        ICM-42688-P~\cite{icm42688:datasheet} & $\pm16$ & 8192 & \numrange{65}{75} & $\pm2000$ & 131 & 2.8 & Zenith \\
+        ICM-45686~\cite{icm45686:datasheet} & $\pm32$ & 16384 & 110 & $\pm4000$ & 131 & 3.8 & This work \\
+        LSM6DSOX~\cite{lsm6dsox:datasheet}    & $\pm16$ & 2048 & 110 & $\pm2000$ & 14.3 & 3.8 & HPR \\
+        LSM6DSO32~\cite{lsm6dso32:datasheet}  & $\pm32$ & 1024 & 220 & $\pm2000$ & 14.3 & 3.8 & Vega, Zenith \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\paragraph{Choice.} The ICM-45686 was selected~\cite{icm45686:datasheet}. Its main advantage is that it provides a wide accelerometer range of $\pm\SI{32}{\gforce}$ without losing resolution: the data can be read in a 20-bit format, which corresponds to \SI{16384}{\lsb/\gforce}, while a 16-bit device with the same full scale, such as the LSM6DSO32, has a resolution of about \SI{1}{m\gforce}, comparable to the noise of the sensor over a bandwidth of \SI{100}{Hz}. The wide range makes a separate high-g accelerometer necessary only for high power rockets. The gyroscope range of $\pm\SI{4000}{\degree/\second}$ exceeds the requirement of \req{F01} and provides a margin for the roll rate of the rocket. Its noise density, \SI{110}{\micro\gforce/\rthz} for the accelerometer and \SI{3.8}{(\milli\degree\per\second)\per\sqrt{\Hz}} for the gyroscope, is comparable to the other devices with the same range. The sensor communicates over an SPI interface at up to \SI{24}{MHz}, compatible with the interfaces of the microcontroller (\cref{sec:mcu-choice}). Drawbacks are its short history, which means fewer reference implementations than the ICM-42xxx or LSM6DS families, and its cost and availability.
+
+\subsection{High-g Accelerometer}
+\label{sec:high-g-choice}
+
+\paragraph{Requirements.} In addition to the IMU described in \cref{sec:imu-choice}, whose accelerometer range is $\pm\SI{32}{\gforce}$, the flight computer includes a separate high-g accelerometer to capture the shocks that occur during the recovery sequence and the landing, namely the firing of the ejection charges, the opening of the parachutes and the impact with the ground, which may exceed the range of the IMU and last only a few milliseconds. The high-g accelerometer shall satisfy the following requirements:
+\begin{itemize}
+    \item a measurement range of at least $\pm\SI{100}{\gforce}$, to capture the peak acceleration of these events (\req{D02});
+    \item an output data rate of at least \SI{1000}{Hz}, high enough to sample shocks lasting a few milliseconds without aliasing;
+    \item a bias and a noise level compatible with the detection and the recording of the events, which are the only uses of this sensor;
+    \item a low cost and good availability (\req{D05}).
+\end{itemize}
+
+\paragraph{Alternatives.} The simplest alternative is to rely only on the IMU, as the CATS Vega does, with the risk of saturating the sensor during the shocks. The separate high-g accelerometers used by the reviewed projects are compared in \cref{tab:high-g-comparison}: the ADXL375 in the Vector II and the H3LIS331DL in the TUDSaT Zenith and in the HPR flight computer. The H3LIS331DL has selectable ranges of $\pm\SI{100}{\gforce}$, $\pm\SI{200}{\gforce}$ and $\pm\SI{400}{\gforce}$, and is compared with the ADXL375 at $\pm\SI{200}{\gforce}$.
+
+\begin{table}[htb]
+    \centering
+    \small
+    \caption{Comparison of the high-g accelerometers used in the flight computers reviewed in \cref{sec:existing}, at the same range of $\pm\SI{200}{\gforce}$.}
+    \label{tab:high-g-comparison}
+    \begin{tabular}{@{}lccccl@{}}
+        \toprule
+        \textbf{Model} & \textbf{Res.} & \textbf{ODR} & \textbf{Noise} & \textbf{0\,\unit{\gforce} offset} & \textbf{Used in} \\
+        & {\footnotesize (\unit{\lsb/\gforce})} & {\footnotesize (\unit{\hertz})} & {\footnotesize (\unit{\milli\gforce/\rthz})} & {\footnotesize (\unit{\milli\gforce})} & \\
+        \midrule
+        ADXL375~\cite{adxl375:datasheet} & 20.5 & 3200 & 5 & $\pm400$ & Vector II, this work \\
+        ADXL372~\cite{adxl372:datasheet} & 10 & 6400 & -- & $\pm1000$ & -- \\
+        H3LIS331DL~\cite{h3lis331dl:datasheet} & 10.2 & 1000 & 15 & $\pm1000$ & Zenith, HPR \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\paragraph{Choice.} The ADXL375 was selected~\cite{adxl375:datasheet}. Its fixed range of $\pm\SI{200}{\gforce}$ covers the expected shocks with margin, and its output data rate of up to \SI{3200}{Hz} is high enough to sample them. Its resolution of about \SI{49}{\milli\gforce} per LSB and its noise density are much worse than those of the IMU, and the zero-g offset is large, so the sensor is used only to detect and record the shocks and not for the estimation of attitude, velocity and position, which rely on the accelerometer of the IMU.
+
+\subsection{Magnetometer}
+\label{sec:mag-choice}
+
+\paragraph{Requirements.} A magnetometer provides an absolute reference for rotation through the Earth's magnetic field, whose intensity is about \SI{48}{\micro\tesla} in Nothern Italy. The magnetometer shall satisfy the following requirements:
+\begin{itemize}
+    \item a 3-axis measurement with a range of at least $\pm\SI{250}{\micro\tesla}$, which covers the Earth's field and the disturbances generated by the electronics of the rocket, such as the current of the pyrotechnic channels, which can reach hundreds of microtesla at a distance of a few millimeters from the board (\req{F01});
+    \item a noise level and a calibration capability that keep the heading error below the limit of \req{P02.02}; 
+    \item an output data rate compatible with the update rate of the heading correction in the estimation filter (\req{P01.01}); 
+    \item a low cost and good availability (\req{D05}).
+\end{itemize}
+
+\paragraph{Alternatives.} The simplest alternative is to omit the magnetometer and estimate the attitude by integrating only the angular rate, as the CATS Vega and the HPR flight computer do (\cref{sec:existing}), at the cost of an unbounded drift of the heading and zero knowledge of the absolute orientation. The magnetometers adopted by the reviewed projects are compared in \cref{tab:mag-comparison}: the LIS3MDL in the TUDSaT Zenith and the MMC5983MA in the Vector II, which however does not estimate the attitude onboard. The MMC5983MA has a lower noise level and a higher output data rate, and provides a SET/RESET function that allows the offset to be measured and removed~\cite{mmc5983ma:datasheet}. The LIS3MDL is no longer recommended for new designs by the manufacturer~\cite{lis3mdl:page}.
+
+\begin{table}[htb]
+    \centering
+    \small
+    \caption{Comparison of the magnetometers used by the flight computers reviewed in \cref{sec:existing} and of the one adopted in this work. ODR is the output data rate. The resolution is the maximum available at the indicated full scale, and the noise is the RMS value in the highest-performance mode.
+    }
+    \label{tab:mag-comparison}
+    \begin{tabular}{@{}lccccl@{}}
+        \toprule
+        \textbf{Model} & \textbf{Range} & \textbf{Res.} & \textbf{ODR} & \textbf{Noise (RMS)} & \textbf{Used in} \\
+        & {\footnotesize (\unit{\micro\tesla})} & {\footnotesize (\unit{\nano\tesla/\lsb})} & {\footnotesize (\unit{\hertz})} & {\footnotesize (\unit{\nano\tesla})} & \\
+        \midrule
+        LIS3MDL~\cite{lis3mdl:datasheet} & $\pm1600$ & 58.5 & 150 & \numrange{320}{410} & Zenith \\
+        MMC5983MA~\cite{mmc5983ma:datasheet} & $\pm800$ & 6.1 & 1000 & 120 & Vector II \\
+        LIS2MDL~\cite{lis2mdl:datasheet} & $\pm4915$ & 150 & 100 & 300 & This work \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\paragraph{Choice.} The LIS2MDL was selected~\cite{lis2mdl:datasheet}. Its noise of about $\SI{300}{nT}$ corresponds to a heading error of about $\SI{0.8}{\degree}$ (1$\sigma$) for a horizontal field of $\SI{22}{\micro\tesla}$, which is small compared to the errors due to the hard-iron and soft-iron disturbances of the rocket, so that the lower noise of the MMC5983MA would not improve the estimate significantly. Its range of $\pm\SI{4915}{\micro\tesla}$ avoids saturation in the presence of local disturbances, with no loss of resolution, which is fixed at \SI{150}{\nano\tesla} per LSB. The sensor is placed far from the the pyrotechnic lines and the servo motors. It communicates over an I\textsuperscript{2}C interface at up to \SI{400}{kHz}, compatible with the interfaces of the microcontroller (\cref{sec:mcu-choice}). Its main disadvantage compared with the MMC5983MA is the lower output data rate, which however is sufficient for the correction step of the filter, and the absence of a degaussing function.
+
+\subsection{Barometer}
+\label{sec:baro-choice}
+
+\paragraph{Requirements.} A barometer measures the atmospheric pressure, from which the altitude of the rocket is obtained with a model of the atmosphere, and provides the absolute altitude reference used to correct the drift of the inertial integration. The barometer shall satisfy the following requirements:
+\begin{itemize}
+    \item a measurement range covering the pressure at the launch site and the pressure at the maximum altitude considered for the design, which is about \SI{265}{hPa} at \SI{10}{km} in the standard atmosphere~\cite{iso2533} (\req{D02});
+    \item a pressure noise corresponding to an altitude noise below the limits of \req{P02.03} and \req{P03.02}, in the configuration used in flight;
+    \item an output data rate compatible with the update rate of the altitude correction in the estimation filter (\req{P01.01});
+    \item a low cost and good availability (\req{D05}).
+\end{itemize}
+The altitude noise corresponding to a given pressure noise grows with altitude, because the air density decreases: \SI{1}{Pa} corresponds to about \SI{8}{cm} near sea level and to about \SI{25}{cm} at \SI{10}{km}.
+
+\paragraph{Alternatives.} The barometers adopted by the reviewed projects are compared in \cref{tab:baro-comparison}: the MS5607 is used by the CATS Vega, the TUDSaT Zenith and the Vector II, the MS5611 by the HPR flight computer, and the BMP580 and the LPS22HB by the Zenith, which uses three barometers for redundancy. The MS5611 has the same pressure range at low pressure as the MS5607 and a lower noise, and the two devices share the same interface~\cite{ms5611:datasheet,ms5607:datasheet}. The BMP580 has a noise about one order of magnitude lower, but its minimum pressure of about \SI{300}{hPa} limits the maximum altitude to about \SI{9}{km} in the standard atmosphere~\cite{bmp580:datasheet}. The maximum output data rate of the LPS22HB is about \SI{75}{Hz}~\cite{lps22hb:datasheet}, which is sufficient only if the rate required by the filter is lower. 
+
+\begin{table}[htb]
+    \centering
+    \small
+    \caption{Comparison of the barometers of the flight computers reviewed in \cref{sec:existing} and of the one adopted in this work. The noise is the RMS value in the indicated configuration, and the altitude noise is computed near sea level ($\SI{1}{Pa}\approx\SI{8.3}{cm}$). OSR is the oversampling ratio.}
+    \label{tab:baro-comparison}
+    \begin{tabularx}{\textwidth}{@{}l c c c c c >{\raggedright\arraybackslash}X@{}}
+        \toprule
+        \textbf{Model} & \textbf{Range} & \textbf{Config.} & \textbf{Noise} & \textbf{Noise} & \textbf{Conv.\ time} & \textbf{Used in} \\
+        & {\footnotesize (\unit{\hecto\pascal})} & & {\footnotesize (\unit{\pascal})} & {\footnotesize (\unit{\centi\metre})} & {\footnotesize (\unit{\milli\second})} & \\
+        \midrule
+        MS5607~\cite{ms5607:datasheet} & \numrange{10}{2000} & OSR 4096 & 2.4 & 20 & 8.22 & Vega, Zenith, Vector II, this work \\
+        MS5611~\cite{ms5611:datasheet} & \numrange{10}{1200} & OSR 4096 & 1.2 & 10 & 8.22 & HPR \\
+        BMP580~\cite{bmp580:datasheet} & \numrange{300}{1250} & OSR 8 & 0.3 & 2.5 & 6.4 & Zenith \\
+        LPS22HB~\cite{lps22hb:datasheet} & \numrange{260}{1260} & -- & 10 & 83 & 13.3 & Zenith \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\paragraph{Choice.} The MS5607 was selected~\cite{ms5607:datasheet}. Its range of \SIrange{10}{2000}{hPa} covers the pressure at the maximum altitude considered for the design, and the sensor is adopted by three of the four reviewed projects. It is read with an oversampling ratio of 4096 for the pressure and 256 for the temperature, which gives a conversion time under \SI{10}{\milli\second}, compatible with the update rate of \SI{100}{\Hz} of the altitude correction, and a pressure noise of about \SI{2.4}{\Pa}, equal to an altitude noise of about \SI{20}{\cm} near the ground. The MS5611 would give a lower noise and is available in the same package with the same interface; it was not selected because it was not available at the time of the design.The sensor communicates over an SPI interface at up to \SI{20}{MHz}, compatible with the interfaces of the microcontroller (\cref{sec:mcu-choice}). 
+
+\subsection{GNSS Receiver}
+\label{sec:gnss-choice}
+
+\paragraph{Requirements.} The GNSS receiver provides the only absolute reference for the horizontal position and the velocity of the rocket. Without it, the horizontal position can be obtained only by integrating the accelerometer, and its error grows quadratically with time, even for a small bias or attitude error; the receiver also allows the rocket to be located after landing through the telemetry link. The GNSS receiver shall satisfy the following requirements:
+\begin{itemize}
+    \item a position accuracy and a velocity accuracy sufficient to keep the estimation errors below the limits of \req{P02.03} and \req{P02.04};
+    \item an update rate of at least \SI{10}{Hz}, compatible with the correction step of the filter, and an output latency that can be compensated;
+    \item operation at the accelerations, velocities and altitudes of the flight, with a dynamic model supporting accelerations of at least \SI{4}{\gforce}; 
+    \item a low cost and good availability (\req{D05}).
+\end{itemize}
+
+\paragraph{Alternatives.} The simplest alternative is to omit the GNSS receiver and rely only on inertial and barometric measurements, as many recovery altimeters do (\cref{sec:existing}), which however does not constrain the horizontal position. The reviewed projects that include a GNSS receiver use u-blox modules: the MAX-M10S in the CATS Vega and the NEO-M9N in the HPR flight computer, while the model used by the TUDSaT Zenith is not specified in the available documentation. The main candidates are compared in \cref{tab:gnss-comparison}. The M9 generation supports a higher update rate and has more tracking channels, while the M10 generation is smaller and has a lower power consumption~\cite{m9n:datasheet,m10s:datasheet}.
+
+\begin{table}[htb]
+    \centering
+    \small
+    \setlength{\tabcolsep}{3pt}
+    \caption{Comparison of GNSS receivers of the flight computers reviewed in \cref{sec:existing} and of the one adopted in this work. The position accuracy is the CEP in open-sky conditions, and the constellations are those received concurrently.}
+    \label{tab:gnss-comparison}
+    \begin{tabularx}{\textwidth}{@{}l c c c c c >{\raggedright\arraybackslash}X@{}}
+        \toprule
+        \textbf{Model} & \textbf{Const.} & \textbf{Max rate} & \textbf{Pos.\ acc.} & \textbf{Vel.\ acc.} & \textbf{Max dyn.} & \textbf{Used in} \\
+        & & {\footnotesize (\unit{\hertz})} & {\footnotesize (\unit{\metre})} & {\footnotesize (\unit{\metre/\second})} & {\footnotesize (\unit{\gforce})} & \\
+        \midrule
+        NEO-M9N~\cite{m9n:datasheet} & 4 & 25 & 1.5 & 0.05 & 4 & HPR, Vector II, this work \\
+        MAX-M10S~\cite{m10s:datasheet} & 4 & 10 & 1.5 & 0.05 & 4 & Vega \\
+        SAM-M10Q~\cite{m10q:datasheet} & 4 & 10 & 1.5 & 0.05 & 4 & -- \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\paragraph{Choice.} The u-blox NEO-M9N was selected~\cite{m9n:datasheet}. It provides a position accuracy of about \SI{1.5}{m} (CEP) and supports four concurrent constellations, which meets \req{P02.03}. The receiver is configured with the airborne $\leq$ 4g dynamic model at an update rate of \SI{25}{Hz}. The receiver communicates over a UART interface up to \SI{115200}{bps}, which is sufficient for the position, velocity and time message at the selected rate. The antenna is a ceramic patch placed on the top of the electronics bay.
+
+\subsection{Radio Module}
+\label{sec:radio-choice}
+
+\paragraph{Requirements.} The radio module provides a telemetry link to the ground station, which allows the flight data to be monitored in real time and the rocket to be located after landing. The radio module shall satisfy the following requirements:
+\begin{itemize}
+    \item a range of at least \SI{1}{km} in line-of-sight conditions;
+    \item a data rate of at least \SI{2.4}{kbps} (\req{P04.02});
+    \item operation in a licence-exempt band;
+    \item an interface that is simple to integrate with the microcontroller (\cref{sec:mcu-choice});
+    \item a low cost and good availability (\req{D05}).
+\end{itemize}
+
+\paragraph{Alternatives.} The simplest alternative is to omit the radio module and rely only on the onboard storage, as the Vector II does, which however does not allow the flight data to be monitored in real time and the rocket to be located after landing. The reviewed projects that include a radio module use LoRa transceivers: a \SI{2.4}{GHz} device in the CATS Vega, an \SI{868}{MHz} device in the TUDSaT Zenith and the RFM95W or RFM96W modules in the HPR flight computer. The main candidates are compared in \cref{tab:radio-comparison}. They fall into two groups: bare transceiver modules, such as the Semtech SX127x-based RFM9x family~\cite{sx1276}, which are controlled through an SPI interface and require the LoRa protocol stack to be implemented in the firmware, and modules with an integrated microcontroller, such as the Ebyte E220 and E22 series, which implement the radio protocol internally and are controlled through a UART interface~\cite{e220:manual}.
+
+\begin{table}[htb]
+    \centering
+    \small
+    \setlength{\tabcolsep}{3pt}
+    \caption{Comparison of the radio modules of the flight computers reviewed in \cref{sec:existing} and of the one adopted in this work.}
+    \label{tab:radio-comparison}
+    \begin{tabularx}{\textwidth}{@{}l c c c c c >{\raggedright\arraybackslash}X@{}}
+        \toprule
+        \textbf{Module} & \textbf{Band} & \textbf{Max power} & \textbf{Interface} & \textbf{Air rate} & \textbf{Sensitivity} & \textbf{Used in} \\
+        & {\footnotesize (\unit{\mega\hertz})} & {\footnotesize (\unit{dBm})} & & {\footnotesize (\unit{kbps})} & {\footnotesize (\unit{dBm})} & \\
+        \midrule
+        RFM95W~\cite{rfm95w:datasheet} & 868/915 & 20 & SPI & 0.018-37.5 & \numrange{-111}{-148} & HPR \\
+        RFM96W~\cite{rfm95w:datasheet} & 433 & 20 & SPI & 0.018-37.5 & \numrange{-111}{-139} & HPR \\
+        E22-900T22S~\cite{e22:manual} & 868/915 & 22 & UART & 2.4--62.5 & -131 & -- \\
+        E220-900T22S~\cite{e220:manual} & 868/915 & 22 & UART & 2.4--62.5 & -126 & This work \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\paragraph{Choice.} The Ebyte E220-900T22S was selected for the flight computer, and the Ebyte E220-900T30D for the ground station~\cite{e220:manual}. The module covers the \SI{868}{MHz} band, communicates over a UART interface at up to \SI{115200}{bps} and supports air data rates from \SI{2.4}{kbps} to \SI{62.5}{kbps}. Since the air rate is lower than the rate of the UART, the interface does not limit the throughput of the link. The radio protocol is implemented inside the module, which can be used in a transparent mode: this removes the need to write and debug an SPI driver and a LoRa stack in the firmware and shortens the development time, which is relevant for a small team. The main drawback is the limited control over the radio. The antenna of the rocket is a quarter-wave monopole placed on the bottom of the electronics bay, and the antenna of the ground station is a half-wave monopole placed on a tripod at about \SI{1}{m} from the ground.

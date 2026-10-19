@@ -1,0 +1,20 @@
+% % % % % % % % % % % % % % % % % %
+%                                 %
+%  Master Thesis                  %
+%  MSc in Aerospace Engineering   %
+%  Mattia Gregnanin               %
+%  A.Y. 2025/2026                 %
+%                                 %
+% % % % % % % % % % % % % % % % % %
+%                                 %
+%  Chapter 1 / Section 5          %
+%                                 %
+% % % % % % % % % % % % % % % % % %
+
+\section{Conclusions}
+
+This chapter reviewed the evolution of flight computers for rockets, from the guidance systems of the first missiles to the compact devices available to amateur rocketry, and described the functional blocks that compose them. The analysis of commercial products and of open-source and student projects showed that most solutions are designed around recovery and flight logging, while a smaller number of projects estimate the state of the rocket onboard and transmit it to the ground. 
+
+Starting from this background, the requirements of the flight computer developed in this work were defined, and each component was selected by comparing the alternatives found in the existing solutions against those requirements: an STM32F405 microcontroller, an ICM-45686 IMU, an ADXL375 high-g accelerometer, a LIS2MDL magnetometer, an MS5607 barometer, a NEO-M9N GNSS receiver and an Ebyte E220 radio module at $\SI{868}{MHz}$.
+
+The next chapter describes the hardware design of the flight computer, from the schematic to the layout and the assembly of the printed circuit board. The algorithms used to estimate the attitude, position and velocity of the rocket from the sensor measurements are presented in \cref{ch:estimation}, and the firmware that implements them in \cref{ch:firmware}.

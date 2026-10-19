@@ -16,7 +16,18 @@ jobs:
       run:
         mkdir tikz-cache
 
-    - name: Compile LaTeX document
+    - name: First main LaTeX document compilation
+      uses: xu-cheng/latex-action@v3
+      with:
+        root_file: Gregnanin_Mattia.tex
+        latexmk_shell_escape: true
+
+    - name: Compile frontispiece 
+      uses: xu-cheng/latex-action@v3
+      with: 
+        root_file: Gregnanin_Mattia-frn.tex
+    
+    - name: Last main LaTeX document compilation
       uses: xu-cheng/latex-action@v3
       with:
         root_file: Gregnanin_Mattia.tex
