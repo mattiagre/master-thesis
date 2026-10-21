@@ -5,49 +5,28 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v4
-    
+      uses: actions/checkout@v7
+
     - name: Create TikZ cache folder
-      run:
-        mkdir tikz-cache
+      run: mkdir -p tikz
 
-    - name: First main LaTeX document compilation
-      uses: xu-cheng/latex-action@v3
+    - name: Compile LaTeX document
+      uses: xu-cheng/latex-action@v4
       with:
         root_file: Gregnanin_Mattia.tex
         latexmk_shell_escape: true
-
-    - name: Compile frontispiece 
-      uses: xu-cheng/latex-action@v3
-      with: 
-        root_file: Gregnanin_Mattia-frn.tex
-    
-    - name: Last main LaTeX document compilation
-      uses: xu-cheng/latex-action@v3
-      with:
-        root_file: Gregnanin_Mattia.tex
-        latexmk_shell_escape: true
-    
-    - name: Install Ghostscript 10.04.0
-      run: |
-        wget https://github.com/ArtifexSoftware/ghostpdl-downloads/releases/download/gs10040/gs_10.04.0_amd64_snap.tgz
-        tar -xvzf gs_10.04.0_amd64_snap.tgz
-        cd gs_10.04.0_amd64_snap
-        sudo snap install --devmode gs_10.04.0_amd64.snap
-
-    - name: Convert PDF to PDF/A
-      run: |
-        cd pdfa
-        gs -dBATCH -dNOPAUSE -dNOSAFER -sDEVICE=pdfwrite -dPDFA=3 -dPDFACompatibilityPolicy=2 -sColorConversionStrategy=RGB -o Gregnanin_Mattia.pdf ${{ github.workspace }}/pdfa/PDFA_def.ps ../Gregnanin_Mattia.pdf
 
     - name: Upload PDF as artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: compiled-pdf
-        path: ./pdfa/Gregnanin_Mattia.pdf
+        path: Gregnanin_Mattia.pdf
